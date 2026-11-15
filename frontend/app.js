@@ -16,7 +16,7 @@ function addSignal(card,amount,budget,currency){
  }else{detail.textContent=budget==null?'月額予算未設定':'料金データ未取得'}
  label.textContent=title;node.append(light,label);card.append(node,detail);
 }
-$('load').onclick=async()=>{
+async function loadBilling(){
  $('message').textContent='取得中…';$('accounts').replaceChildren();$('total').textContent='取得中…';
 
  try{
@@ -48,4 +48,7 @@ $('load').onclick=async()=>{
   }
   $('message').textContent=data.total_month==null?'一部の課金データが未取得のため、合計は表示できません。各プロジェクトの信号は個別に判定します。':'利用料金は反映遅延があります。確定請求額ではありません。';
  }catch(e){$('message').textContent=e.message;$('total').textContent='取得失敗'}
-};
+}
+// Attempt automatic loading on every dashboard open. Existing API token requirement remains until secure auth migration.
+window.addEventListener('DOMContentLoaded',loadBilling);
+$('load').onclick=loadBilling;
