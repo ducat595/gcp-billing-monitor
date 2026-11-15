@@ -23,11 +23,22 @@ if(!cached||cached.day!==today){
   }catch(e){error=true}
  }else{error=true}
 }
-const w=new ListWidget();w.backgroundColor=new Color("#17243a");
-const title=w.addText("GCP 利用料金");title.textColor=Color.white();title.font=Font.boldSystemFont(15);
+const w=new ListWidget();
+const gradient=new LinearGradient();
+gradient.colors=[new Color("#1d3b62"),new Color("#10192c"),new Color("#0b1323")];
+gradient.locations=[0,0.5,1];w.backgroundGradient=gradient;
+w.setPadding(16,18,14,18);
+const top=w.addStack();top.centerAlignContent();
+const title=top.addText("◉  GCP BILLING");title.textColor=new Color("#a9d5ff");title.font=Font.boldSystemFont(11);
+top.addSpacer();
+const date=top.addText(today);date.textColor=new Color("#839bb9");date.font=Font.systemFont(10);
 w.addSpacer(12);
-const amount=w.addText("取得待ち");amount.font=Font.boldSystemFont(25);amount.textColor=Color.white();
-const detail=w.addText("");detail.textColor=new Color("#a9b7cb");detail.font=Font.systemFont(11);
+const caption=w.addText("当月の利用料金");caption.textColor=new Color("#a9b7cb");caption.font=Font.systemFont(11);
+w.addSpacer(4);
+const amount=w.addText("取得待ち");amount.font=Font.boldSystemFont(27);amount.textColor=Color.white();
+w.addSpacer(12);
+const detail=w.addText("");detail.textColor=new Color("#c3d4e9");detail.font=Font.systemFont(11);
+w.url="https://tesla-charge-collector.tail522b23.ts.net/";
 if(record&&record.data){
  const data=record.data;
  amount.text=format(data.total_month,data.currency);
