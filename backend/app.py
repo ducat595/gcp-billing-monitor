@@ -96,6 +96,13 @@ def billing(x_api_key: str | None = Header(default=None)):
             except Exception:
                 # Avoid exposing Google API internals to public clients.
                 accounts[key] = {"name": name, "status": "error"}
+        # Each export project has its own budget. Missing/zero means not configured.
+        for key, account in accounts.items():
+            raw_budget = os.getenv(f"{key.upper()}_MONTHLY_BUDGET", "").strip()
+            try:
+                account["budget"] = float(raw_budget) if raw_budget and float(raw_budget) > 0 else None
+            except ValueError:
+                account["budget"] = None
         ready = [v for v in accounts.values() if v["status"] == "ready"]
         currencies = {v["currency"] for v in ready}
         total = round(sum(v["month"] for v in ready), 2) if len(ready) == len(accounts) and len(currencies) == 1 else None
