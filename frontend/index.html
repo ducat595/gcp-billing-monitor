@@ -10,7 +10,6 @@
 <section class="settings"><label>API URL <input id="url" placeholder="https://example.com/api/billing"></label><label>閲覧トークン <input id="token" type="password" autocomplete="off"></label><button id="load">料金を取得</button><small>認証情報はブラウザに保存しません。</small></section>
 <section class="summary">
 <div class="panel"><h2>当月合計</h2><strong id="total">未取得</strong></div>
-<div class="panel"><h2>予算信号</h2><div id="budget-signal" class="budget-signal unknown" role="status" aria-live="polite"><span class="signal-light" aria-hidden="true"></span><strong id="signal-label">判定待ち</strong></div><p id="signal-detail">料金取得後に判定します</p><small>緑：80%未満 / 黄：80～100% / 赤：100%超</small></div>
 <div class="panel"><h2>最終取得</h2><span id="updated">—</span></div>
 </section>
 <section id="accounts" class="accounts"></section><p id="message" role="status"></p>
