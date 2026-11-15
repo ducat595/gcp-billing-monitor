@@ -1,0 +1,7 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GCP Billing Monitor</title><link rel="stylesheet" href="style.css"></head>
+<body><main><header><h1>GCP Billing Monitor</h1><p>2つの請求先アカウントをまとめて確認</p></header>
+<section class="settings"><label>API URL <input id="url" placeholder="https://example.com/api/billing"></label><label>閲覧トークン <input id="token" type="password" autocomplete="off"></label><button id="load">料金を取得</button><small>認証情報はブラウザに保存しません。</small></section>
+<section class="summary"><div class="panel"><h2>当月合計</h2><strong id="total">未取得</strong></div><div class="panel"><h2>最終取得</h2><span id="updated">—</span></div></section>
+<section id="accounts" class="accounts"></section><p id="message" role="status"></p>
+</main><script src="app.js"></script></body></html>
