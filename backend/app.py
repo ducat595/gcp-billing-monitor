@@ -106,3 +106,11 @@ def billing(x_api_key: str | None = Header(default=None)):
         # Retry transient failures sooner; never cache an error for a full hour.
         _cache_until = monotonic() + (min(ttl, 300) if any(a["status"] == "error" for a in accounts.values()) else ttl)
         return _cache_value
+
+# Serve the dashboard from the same HTTPS origin as the API.
+# Keep this mount last so /api/billing remains available.
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+_frontend = Path(__file__).resolve().parents[1] / "frontend"
+if _frontend.is_dir():
+    app.mount("/", StaticFiles(directory=str(_frontend), html=True), name="dashboard")
