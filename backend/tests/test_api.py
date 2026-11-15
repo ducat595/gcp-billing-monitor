@@ -55,6 +55,31 @@ class BillingApiTests(unittest.TestCase):
         self.assertEqual(cached, result)
         self.assertEqual(read.call_count, 2)
 
+    def test_budget_warning_when_forecast_exceeds_budget(self):
+        a = {"status": "ready", "currency": "JPY", "month": 500, "forecast": 700}
+        b = {"status": "ready", "currency": "JPY", "month": 200, "forecast": 500}
+        with patch.object(billing_app, "read_account", side_effect=[a, b]):
+            result = billing_app.billing("test-only-secret")
+        self.assertEqual(result["total_month"], 700)
+        self.assertEqual(result["forecast"], 1200)
+        self.assertTrue(result["over_budget"])
+
+    def test_cache_does_not_bypass_authentication(self):
+        a = {"status": "ready", "currency": "JPY", "month": 100, "forecast": 200}
+        with patch.object(billing_app, "read_account", return_value=a):
+            billing_app.billing("test-only-secret")
+            from fastapi import HTTPException
+            with self.assertRaises(HTTPException) as error:
+                billing_app.billing("wrong")
+        self.assertEqual(error.exception.status_code, 401)
+
+    def test_transient_errors_use_short_cache(self):
+        with patch.object(billing_app, "read_account", side_effect=RuntimeError("offline")):
+            with patch.object(billing_app, "monotonic", return_value=100):
+                result = billing_app.billing("test-only-secret")
+        self.assertIsNone(result["total_month"])
+        self.assertEqual(billing_app._cache_until, 400)
+
     def test_empty_export_tables_are_pending(self):
         fake_client = MagicMock()
         fake_client.list_tables.return_value = []
