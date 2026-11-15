@@ -1,4 +1,5 @@
 const $=id=>document.getElementById(id);
+$('url').value=new URL('/api/billing',location.origin).href;
 const money=(v,c)=>v==null?'データ反映待ち':new Intl.NumberFormat('ja-JP',{style:'currency',currency:c||'JPY',maximumFractionDigits:2}).format(v);
 const status={pending:'課金データ反映待ち',error:'取得エラー',currency_mismatch:'通貨の確認が必要',ready:'取得済み'};
 $('load').onclick=async()=>{
