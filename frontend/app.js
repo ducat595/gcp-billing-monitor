@@ -2,8 +2,20 @@ const $=id=>document.getElementById(id);
 $('url').value=new URL('/api/billing',location.origin).href;
 const money=(v,c)=>v==null?'データ反映待ち':new Intl.NumberFormat('ja-JP',{style:'currency',currency:c||'JPY',maximumFractionDigits:2}).format(v);
 const status={pending:'課金データ反映待ち',error:'取得エラー',currency_mismatch:'通貨の確認が必要',ready:'取得済み'};
+function updateSignal(total,budget,currency){
+ const node=$('budget-signal'),label=$('signal-label'),detail=$('signal-detail');
+ let level='unknown',title='判定不可',description='料金または月額予算が未設定です';
+ if(Number.isFinite(total)&&Number.isFinite(budget)&&budget>0){
+  const ratio=total/budget;
+  level=ratio>1?'red':ratio>=0.8?'yellow':'green';
+  title=level==='red'?'赤信号・予算超過':level==='yellow'?'黄信号・予算接近':'緑信号・予算内';
+  description=money(total,currency)+' / '+money(budget,currency)+'（'+(ratio*100).toFixed(1)+'%）';
+ }
+ node.className='budget-signal '+level;label.textContent=title;detail.textContent=description;
+}
 $('load').onclick=async()=>{
  $('message').textContent='取得中…';$('accounts').replaceChildren();$('total').textContent='取得中…';
+ updateSignal(null,null,null);
  try{
   const u=new URL($('url').value);if(u.protocol!=='https:'&&!['localhost','127.0.0.1'].includes(u.hostname))throw Error('HTTPSのAPI URLを指定してください');
   const res=await fetch(u,{headers:{'X-API-Key':$('token').value},cache:'no-store'});
@@ -11,12 +23,13 @@ $('load').onclick=async()=>{
   const data=await res.json();
   $('total').textContent=money(data.total_month,data.currency);
   $('updated').textContent=new Date(data.generated_at).toLocaleString('ja-JP');
+  updateSignal(data.total_month,data.budget,data.currency);
   const summary=document.querySelector('.summary');
   summary.querySelectorAll('[data-extra]').forEach(n=>n.remove());
   const addMetric=(label,value)=>{const box=document.createElement('div');box.className='panel';box.dataset.extra='true';const h=document.createElement('h2');h.textContent=label;const v=document.createElement('strong');v.textContent=value;box.append(h,v);summary.append(box)};
   addMetric('月末予測',money(data.forecast,data.currency));
   addMetric('月額予算',data.budget==null?'未設定':money(data.budget,data.currency));
-  if(data.over_budget===true)addMetric('予算警告','月末予測が予算を超過');
+  if(data.over_budget===true)addMetric('予測警告','月末予測が予算を超過する見込み');
   for(const a of Object.values(data.accounts)){
    const card=document.createElement('article');card.className='account';
    const h=document.createElement('h2');h.textContent=a.name;card.append(h);
@@ -28,6 +41,6 @@ $('load').onclick=async()=>{
     for(const d of a.daily){const bar=document.createElement('div');bar.className='bar';bar.style.height=Math.max(2,Math.max(0,d.amount)/max*100)+'%';bar.title=d.date+' '+money(d.amount,a.currency);bars.append(bar)}card.append(bars)
    }$('accounts').append(card);
   }
-  $('message').textContent=data.total_month==null?'一部の課金データが未取得のため、合計は表示していません。':'利用料金は反映遅延があります。確定請求額ではありません。';
- }catch(e){$('message').textContent=e.message;$('total').textContent='取得失敗'}
+  $('message').textContent=data.total_month==null?'一部の課金データが未取得のため、合計と信号は判定できません。':'利用料金は反映遅延があります。確定請求額ではありません。';
+ }catch(e){$('message').textContent=e.message;$('total').textContent='取得失敗';updateSignal(null,null,null)}
 };
