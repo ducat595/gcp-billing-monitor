@@ -4,3 +4,32 @@
 .signal-detail{font-size:.9rem;color:#d1def0;overflow-wrap:anywhere;margin:4px 0 12px}.account .budget-signal{margin-top:16px}.account .budget-signal span:not(.signal-light){font-weight:700}
 
 .settings{display:block;margin:14px 0}.settings summary{cursor:pointer;font-weight:700;list-style-position:inside}.settings-content{display:grid;gap:12px;margin-top:14px}.actions{display:flex;justify-content:flex-end;margin:12px 0}.actions button{min-width:150px}
+
+/* Refined cloud-finance dashboard */
+:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:#090e1b;color:#f2f6ff}
+body{min-height:100vh;background:radial-gradient(ellipse 75% 30% at 50% -5%,#183866 0%,transparent 75%),linear-gradient(160deg,#0b1222,#090e1b 65%)}
+main{max-width:1100px;padding:clamp(18px,4vw,48px) clamp(16px,4vw,36px) 72px}
+header{position:relative;padding:12px 0 22px}
+header h1{font-size:clamp(2.4rem,6vw,4.4rem);font-weight:800;letter-spacing:-.055em;line-height:1.08;margin:14px 0 10px}
+header h1 span{background:linear-gradient(100deg,#82b8ff,#7ce2e6);color:transparent;background-clip:text;-webkit-background-clip:text}
+header p{font-size:1rem;color:#a8b9d5;margin:0}
+.eyebrow{color:#76a9f9;font-size:.68rem;font-weight:800;letter-spacing:.18em}
+.billing-links{margin:24px 0 0}.billing-links a{display:inline-flex;align-items:center;background:#15253c;border-color:#3a5274;border-radius:12px;padding:11px 16px;font-weight:600;transition:background .2s,transform .2s}.billing-links a:hover{background:#213b5d;transform:translateY(-1px)}
+.section-heading{display:flex;justify-content:space-between;align-items:end;gap:12px;margin:28px 0 12px}.section-heading h2{margin:5px 0 0;font-size:1.18rem;letter-spacing:-.02em}.period{font-size:.78rem;color:#9baec9}
+.settings{margin-top:18px;background:#111c30;border-color:#263e5b;border-radius:13px;padding:13px 18px}.settings summary{color:#bfd1ea}.settings-content small{line-height:1.5}
+.actions{margin:12px 0}.actions button{border-radius:11px;background:linear-gradient(125deg,#75b5ff,#4a85f7);padding:12px 20px;box-shadow:0 6px 20px #3276ed25}
+.summary{grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-top:0}.accounts{grid-template-columns:repeat(auto-fit,minmax(290px,1fr));margin-top:0}
+.panel,.account{position:relative;overflow:hidden;background:linear-gradient(145deg,#17263e,#101a2d);border:1px solid #2b405d;border-radius:19px;padding:24px;box-shadow:0 12px 32px #00000020}
+.panel:before,.account:before{content:"";position:absolute;left:0;top:0;right:0;height:2px;background:linear-gradient(90deg,#548fff,transparent)}
+.panel h2,.account h2{color:#b5c6dd;font-size:.86rem;font-weight:600;margin:0 0 16px}
+.panel strong,.account strong{display:block;font-size:clamp(1.65rem,3.2vw,2.45rem);letter-spacing:-.045em;line-height:1.15;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.total-panel{background:linear-gradient(135deg,#1c3a60,#17263f 70%,#101a2d)}
+.project-tag{font-size:.65rem;letter-spacing:.13em;color:#82b5ff;font-weight:800;margin-bottom:14px}
+.account h2{font-size:1.08rem;color:#f2f6ff;margin-bottom:20px}.metric-caption{font-size:.77rem;color:#a9bdd9;margin-bottom:7px}
+.account .budget-signal{border:1px solid #354962;border-radius:11px;padding:10px 12px;background:#0e1b2f;margin-top:20px;font-size:.85rem}
+.signal-light{width:15px;height:15px}.signal-detail{margin:9px 0 15px;color:#afc1dc;font-size:.82rem}
+.forecast-line{padding:14px 0;border-top:1px solid #2a3d55;color:#d3e1f5;font-size:.87rem;line-height:1.8}
+.account ul{list-style:none;padding:0;margin:16px 0}.account li{padding:8px 0;border-bottom:1px solid #253950;color:#9eb5d1;font-size:.82rem}
+.bars{border-bottom:1px solid #344968;padding-bottom:2px}.bar{background:linear-gradient(180deg,#86c6ff,#477ce4);border-radius:4px 4px 0 0}
+#updated{font-variant-numeric:tabular-nums;color:#dce8fa}#message{font-size:.85rem;color:#c7b587;margin-top:20px}
+@media(max-width:560px){.period{display:none}.panel,.account{padding:20px}.billing-links a{width:100%;justify-content:center}.actions button{width:100%}.accounts{grid-template-columns:minmax(0,1fr)}}
