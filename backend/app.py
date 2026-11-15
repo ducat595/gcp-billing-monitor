@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from functools import lru_cache
 from threading import Lock
 from time import monotonic
@@ -43,6 +43,9 @@ def read_account(name, project, dataset):
     currencies = set()
     previous = {}
     services = {}
+    now = datetime.now(ZoneInfo("Asia/Tokyo"))
+    current_month = now.strftime("%Y-%m")
+    previous_month = (now.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
     for table in ids:
         if not re.fullmatch(r"gcp_billing_export_v1_[A-F0-9_]+", table):
             continue
@@ -60,20 +63,18 @@ def read_account(name, project, dataset):
         job = client().query(sql, job_config=bigquery.QueryJobConfig(maximum_bytes_billed=100_000_000))
         for row in job.result():
             currencies.add(row.currency)
-            if month := row.month:
-                if month == datetime.now(ZoneInfo("Asia/Tokyo")).strftime("%Y-%m"):
-                    services[row.service_name] = services.get(row.service_name, 0) + float(row.net)
-            month = row.month
-            if month == datetime.now(timezone.utc).astimezone(__import__("zoneinfo").ZoneInfo("Asia/Tokyo")).strftime("%Y-%m"):
-                daily[row.day] = daily.get(row.day, 0) + float(row.net)
-            else:
-                previous[month] = previous.get(month, 0) + float(row.net)
+            value = float(row.net)
+            if row.month == current_month:
+                services[row.service_name or "Unknown"] = services.get(row.service_name or "Unknown", 0) + value
+                daily[row.day] = daily.get(row.day, 0) + value
+            elif row.month == previous_month:
+                previous[row.month] = previous.get(row.month, 0) + value
     if not currencies:
         return {"name": name, "status": "pending", "currency": None, "month": None, "previous_month": None, "daily": []}
     if len(currencies) != 1:
         return {"name": name, "status": "currency_mismatch", "currencies": sorted(currencies)}
-    now = datetime.now(ZoneInfo("Asia/Tokyo"))
     days = monthrange(now.year, now.month)[1]
+    # Forecast assumes uniform daily usage; it is not a Google Cloud invoice forecast.
     forecast = round(sum(daily.values()) / now.day * days, 2) if daily else None
     return {"name": name, "status": "ready", "currency": next(iter(currencies)), "month": round(sum(daily.values()), 2), "previous_month": round(sum(previous.values()), 2), "forecast": forecast, "services": [{"name": k, "amount": round(v, 2)} for k,v in sorted(services.items(), key=lambda p: -p[1])], "daily": [{"date": d, "amount": round(v, 2)} for d,v in sorted(daily.items())]}
 
@@ -101,5 +102,7 @@ def billing(x_api_key: str | None = Header(default=None)):
         forecast = round(sum(v["forecast"] for v in ready), 2) if total is not None and all(v.get("forecast") is not None for v in ready) else None
         budget = float(os.getenv("MONTHLY_BUDGET", "0"))
         _cache_value = {"generated_at": datetime.now(timezone.utc).isoformat(), "accounts": accounts, "total_month": total, "forecast": forecast, "budget": budget or None, "over_budget": forecast > budget if forecast is not None and budget > 0 else None, "currency": next(iter(currencies)) if len(currencies) == 1 else None}
-        _cache_until = monotonic() + max(300, int(os.getenv("CACHE_SECONDS", "3600")))
+        ttl = max(300, int(os.getenv("CACHE_SECONDS", "3600")))
+        # Retry transient failures sooner; never cache an error for a full hour.
+        _cache_until = monotonic() + (min(ttl, 300) if any(a["status"] == "error" for a in accounts.values()) else ttl)
         return _cache_value
