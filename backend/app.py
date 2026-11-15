@@ -68,6 +68,8 @@ def read_account(name, project, dataset):
                 daily[row.day] = daily.get(row.day, 0) + float(row.net)
             else:
                 previous[month] = previous.get(month, 0) + float(row.net)
+    if not currencies:
+        return {"name": name, "status": "pending", "currency": None, "month": None, "previous_month": None, "daily": []}
     if len(currencies) != 1:
         return {"name": name, "status": "currency_mismatch", "currencies": sorted(currencies)}
     now = datetime.now(ZoneInfo("Asia/Tokyo"))
