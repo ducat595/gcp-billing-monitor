@@ -38,7 +38,7 @@ w.addSpacer(4);
 const amount=w.addText("取得待ち");amount.font=Font.boldSystemFont(27);amount.textColor=Color.white();
 w.addSpacer(12);
 const detail=w.addText("");detail.textColor=new Color("#c3d4e9");detail.font=Font.systemFont(11);
-w.url="https://tesla-charge-collector.tail522b23.ts.net/";
+w.url="https://tesla-charge-collector.tail522b23.ts.net:8767/";
 if(record&&record.data){
  const data=record.data;
  amount.text=format(data.total_month,data.currency);
