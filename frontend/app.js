@@ -22,6 +22,13 @@ async function loadBilling(){
  try{
   const u=new URL($('url').value);if(u.protocol!=='https:'&&!['localhost','127.0.0.1'].includes(u.hostname))throw Error('HTTPSのAPI URLを指定してください');
   if(u.origin!==location.origin || u.pathname!=='/api/billing')throw Error('この画面と同じAPI URLを指定してください');
+  const pairing=new URL(location.href).searchParams.get('widget_id');
+  let widgetId=null;
+  try {
+   if(pairing && /^[a-f0-9-]{36}$/.test(pairing)) localStorage.setItem('billingWidgetId',pairing);
+   widgetId=localStorage.getItem('billingWidgetId');
+  } catch(e) { widgetId=pairing; }
+  if(widgetId)u.searchParams.set('widget_id',widgetId);
   const token=$('token').value;
   if(token){
    const login=await fetch('/api/session',{method:'POST',headers:{'X-API-Key':token},credentials:'same-origin',cache:'no-store'});
