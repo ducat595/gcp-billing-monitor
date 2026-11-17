@@ -46,10 +46,12 @@ def read_budget(key, currency):
     credentials, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
     url = "https://billingbudgets.googleapis.com/v1/billingAccounts/" + BILLING_ACCOUNTS[key] + "/budgets"
     candidates = []
-    params = {"pageSize": 100}
+    params = {}
     with AuthorizedSession(credentials) as session:
         while True:
             response = session.get(url, params=params, timeout=20)
+            if not response.ok:
+                logging.getLogger(__name__).warning("Budget API HTTP %s for %s: %s", response.status_code, key, response.text[:2000])
             response.raise_for_status()
             payload = response.json()
             for budget in payload.get("budgets", []):
