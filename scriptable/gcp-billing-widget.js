@@ -59,14 +59,29 @@ if(record&&record.data){
  detail.text=API_URL&&API_TOKEN?"通信エラー：次回更新時に再試行":"API URLとトークンを設定してください";
 }
 w.addSpacer(3);
-const expiry=record?.data?.browser_session_expires_at;
+let expiry=record?.data?.browser_session_expires_at;
+let expiryError=false;
+if(API_URL&&API_TOKEN){
+ try{
+  const req=new Request(API_URL.replace(/\/billing$/, "/session-expiry")+'?widget_id='+encodeURIComponent(widgetId));
+  req.headers={"X-API-Key":API_TOKEN};
+  req.timeoutInterval=10;
+  const state=await req.loadJSON();
+  if(req.response.statusCode!==200||!Object.prototype.hasOwnProperty.call(state,"browser_session_expires_at"))throw Error("Expiry unavailable");
+  expiry=state.browser_session_expires_at;
+  if(record&&record.data){
+   record.data.browser_session_expires_at=expiry;
+   fm.writeString(cachePath,JSON.stringify(record));
+  }
+ }catch(e){expiryError=true}
+}
 const days=Number.isFinite(expiry)?Math.max(0,Math.ceil((expiry*1000-Date.now())/86400000)):null;
 const auth=w.addText(days===null?"⚪ 認証期限：未確認・タップして連携":days===0?"🔴 認証期限切れ・再認証":days<=7?"🔴 残り"+days+"日・ブラウザを開く":days<=30?"🟡 残り"+days+"日・ブラウザを開く":"🟢 認証期限：残り"+days+"日");
+if(expiryError)auth.text=auth.text+"（更新失敗）";
 auth.font=Font.systemFont(10);
 auth.textColor=new Color(days===null?"#c3d4e9":days<=7?"#ff8585":days<=30?"#ffd166":"#79e6af");
 // Scriptable/iOS may delay refresh; cache prevents repeated successful daily API calls.
-const tomorrow=new Date();tomorrow.setHours(24,5,0,0);
-w.refreshAfterDate=tomorrow;
+w.refreshAfterDate=new Date(Date.now()+30*60*1000);
 Script.setWidget(w);
 if(!config.runsInWidget)await w.presentMedium();
 Script.complete();
