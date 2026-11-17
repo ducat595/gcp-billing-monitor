@@ -21,7 +21,15 @@ async function loadBilling(){
 
  try{
   const u=new URL($('url').value);if(u.protocol!=='https:'&&!['localhost','127.0.0.1'].includes(u.hostname))throw Error('HTTPSのAPI URLを指定してください');
-  const res=await fetch(u,{headers:{'X-API-Key':$('token').value},cache:'no-store'});
+  if(u.origin!==location.origin || u.pathname!=='/api/billing')throw Error('この画面と同じAPI URLを指定してください');
+  const token=$('token').value;
+  if(token){
+   const login=await fetch('/api/session',{method:'POST',headers:{'X-API-Key':token},credentials:'same-origin',cache:'no-store'});
+   if(!login.ok)throw Error('認証失敗: '+login.status);
+   $('token').value='';
+  }
+  const res=await fetch(u,{credentials:'same-origin',cache:'no-store'});
+  if(res.status===401){$('settings').open=true;throw Error('初回のみ閲覧トークンを入力し、料金を再取得してください。');}
   if(!res.ok)throw Error('API応答: '+res.status);
   const data=await res.json();
   $('total').textContent=money(data.total_month,data.currency);
@@ -50,6 +58,6 @@ async function loadBilling(){
   $('message').textContent=data.total_month==null?'一部の課金データが未取得のため、合計は表示できません。各プロジェクトの信号は個別に判定します。':'利用料金は反映遅延があります。確定請求額ではありません。';
  }catch(e){$('message').textContent=e.message;$('total').textContent='取得失敗'}
 }
-// Attempt automatic loading on every dashboard open. Existing API token requirement remains until secure auth migration.
+// Automatically load using the secure session cookie.
 window.addEventListener('DOMContentLoaded',loadBilling);
 $('load').onclick=loadBilling;
