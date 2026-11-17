@@ -3,6 +3,9 @@ import hmac
 import hashlib
 import logging
 import time
+import sqlite3
+import re
+from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from functools import lru_cache
 from threading import Lock
@@ -146,6 +149,26 @@ def renew_session(response: Response):
     expiry = str(int(time.time()) + SESSION_SECONDS)
     response.set_cookie(COOKIE_NAME, expiry + "." + session_signature(os.environ["BILLING_READ_TOKEN"], expiry),
                         max_age=SESSION_SECONDS, httponly=True, secure=True, samesite="strict", path="/api")
+    return int(expiry)
+
+# Store only expiry metadata, never API keys or session cookies.
+def tracked_expiry(widget_id, expiry=None):
+    if not widget_id or not re.fullmatch(r"[a-f0-9-]{36}", widget_id):
+        return None
+    try:
+        db = Path.home() / ".local/state/gcp-billing-monitor/session-expiry.sqlite3"
+        db.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        with sqlite3.connect(db, timeout=5) as conn:
+            conn.execute("CREATE TABLE IF NOT EXISTS expiry (id TEXT PRIMARY KEY, expires INTEGER NOT NULL, generation TEXT NOT NULL)")
+            generation = hmac.new(os.environ["BILLING_READ_TOKEN"].encode(), b"expiry-tracking-v1", hashlib.sha256).hexdigest()
+            if expiry is not None:
+                conn.execute("INSERT INTO expiry VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET expires=excluded.expires, generation=excluded.generation", (widget_id, expiry, generation))
+            row = conn.execute("SELECT expires FROM expiry WHERE id=? AND generation=?", (widget_id, generation)).fetchone()
+            return row[0] if row else None
+    except (OSError, sqlite3.Error):
+        logging.getLogger(__name__).exception("Session expiry tracking unavailable")
+        return None
+
 
 @app.post("/api/session")
 def create_session(response: Response, x_api_key: str | None = Header(default=None)):
@@ -156,15 +179,17 @@ def create_session(response: Response, x_api_key: str | None = Header(default=No
 
 @app.get("/api/billing")
 def billing(request: Request, response: Response, x_api_key: str | None = Header(default=None)):
+    widget_id = request.query_params.get("widget_id")
     if x_api_key or not valid_session(request.cookies.get(COOKIE_NAME)):
         authorized(x_api_key)
     else:
-        renew_session(response)
+        tracked_expiry(widget_id, renew_session(response))
+    expiry = tracked_expiry(widget_id)
     response.headers["Cache-Control"] = "no-store"
     global _cache_until, _cache_value
     with _cache_lock:
         if _cache_value is not None and monotonic() < _cache_until:
-            return _cache_value
+            return {**_cache_value, "browser_session_expires_at": expiry}
         accounts = {}
         for key, (name, project, dataset) in SOURCES.items():
             try:
@@ -188,7 +213,7 @@ def billing(request: Request, response: Response, x_api_key: str | None = Header
         ttl = max(300, int(os.getenv("CACHE_SECONDS", "3600")))
         # Retry transient failures sooner; never cache an error for a full hour.
         _cache_until = monotonic() + (min(ttl, 300) if any(a["status"] == "error" or a.get("budget_status") == "error" for a in accounts.values()) else ttl)
-        return _cache_value
+        return {**_cache_value, "browser_session_expires_at": expiry}
 
 # Serve the dashboard from the same HTTPS origin as the API.
 # Keep this mount last so /api/billing remains available.
