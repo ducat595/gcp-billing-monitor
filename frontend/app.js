@@ -2,7 +2,7 @@ const $=id=>document.getElementById(id);
 $('url').value=new URL('/api/billing',location.origin).href;
 const money=(v,c)=>v==null?'データ反映待ち':new Intl.NumberFormat('ja-JP',{style:'currency',currency:c||'JPY',maximumFractionDigits:2}).format(v);
 const status={pending:'課金データ反映待ち',error:'取得エラー',currency_mismatch:'通貨の確認が必要',ready:'取得済み'};
-function addSignal(card,amount,budget,currency){
+function addSignal(card,amount,budget,currency,budgetStatus){
  const node=document.createElement('div');node.className='budget-signal unknown';node.setAttribute('role','status');
  const light=document.createElement('span');light.className='signal-light';light.setAttribute('aria-hidden','true');
  const label=document.createElement('span');let title='判定不可';
@@ -13,7 +13,7 @@ function addSignal(card,amount,budget,currency){
   node.className='budget-signal '+level;
   title=level==='red'?'赤信号・予算超過':level==='yellow'?'黄信号・予算接近':'緑信号・予算内';
   detail.textContent=money(amount,currency)+' / '+money(budget,currency)+'（'+(ratio*100).toFixed(1)+'%）';
- }else{detail.textContent=budget==null?'月額予算未設定':'料金データ未取得'}
+ }else{detail.textContent=budget==null?({error:'GCP予算取得エラー',ambiguous:'対象の月額予算が複数あります',not_configured:'対象の全アカウント月額予算なし',currency_mismatch:'予算と課金額の通貨を確認してください'}[budgetStatus]||'月額予算未取得'):'料金データ未取得'}
  label.textContent=title;node.append(light,label);card.append(node,detail);
 }
 async function loadBilling(){
@@ -47,7 +47,7 @@ async function loadBilling(){
    const h=document.createElement('h2');h.textContent=a.name;card.append(h);
    const strong=document.createElement('strong');strong.textContent=a.status==='ready'?money(a.month,a.currency):status[a.status]||'不明';card.append(strong);
    const current=document.createElement('p');current.className='metric-caption';current.textContent='現在の課金額';card.insertBefore(current,strong);
-   addSignal(card,a.status==='ready'?a.month:null,a.budget,a.currency);
+   addSignal(card,a.status==='ready'?a.month:null,a.budget,a.currency,a.budget_status);
    if(a.status==='ready'){
     const p=document.createElement('p');p.className='forecast-line';p.textContent='月末請求見込み: '+money(a.forecast,a.currency)+' / 前月: '+money(a.previous_month,a.currency);card.append(p);
     if(Array.isArray(a.services)){const list=document.createElement('ul');for(const service of a.services.slice(0,5)){const li=document.createElement('li');li.textContent=service.name+': '+money(service.amount,a.currency);list.append(li)}card.append(list)}
