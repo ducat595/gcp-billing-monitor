@@ -177,6 +177,12 @@ def create_session(response: Response, x_api_key: str | None = Header(default=No
     response.headers["Cache-Control"] = "no-store"
     return {"ok": True}
 
+@app.get("/api/session-expiry")
+def session_expiry(response: Response, widget_id: str, x_api_key: str | None = Header(default=None)):
+    authorized(x_api_key)
+    response.headers["Cache-Control"] = "no-store"
+    return {"browser_session_expires_at": tracked_expiry(widget_id)}
+
 @app.get("/api/billing")
 def billing(request: Request, response: Response, x_api_key: str | None = Header(default=None)):
     widget_id = request.query_params.get("widget_id")
