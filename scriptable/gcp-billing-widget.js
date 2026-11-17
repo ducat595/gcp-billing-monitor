@@ -10,15 +10,15 @@ try{if(fm.fileExists(cachePath))cached=JSON.parse(fm.readString(cachePath))}catc
 let record=cached;
 let error=false;
 // One successful request per Japan calendar day; retry failures on later refreshes.
-if(!cached||cached.day!==today){
+if(!cached||cached.day!==today||cached.version!==2){
  if(API_URL&&API_TOKEN){
   try{
    const req=new Request(API_URL);
    req.headers={"X-API-Key":API_TOKEN};
    req.timeoutInterval=15;
    const data=await req.loadJSON();
-   if(!data||!data.accounts)throw Error("Invalid response");
-   record={day:today,data};
+   if(!data||!data.accounts||Object.values(data.accounts).some(a=>a.status!=="ready"||a.budget_status==="error"))throw Error("Data unavailable");
+   record={day:today,data,version:2};
    fm.writeString(cachePath,JSON.stringify(record));
   }catch(e){error=true}
  }else{error=true}
@@ -42,7 +42,12 @@ w.url="https://tesla-charge-collector.tail522b23.ts.net:8767/";
 if(record&&record.data){
  const data=record.data;
  amount.text=format(data.total_month,data.currency);
- const lines=Object.values(data.accounts).map(a=>a.name+": "+(a.status==="ready"?format(a.month,a.currency):"未取得"));
+ const lines=Object.values(data.accounts).map(a=>{
+  const valid=a.status==="ready"&&Number.isFinite(a.month)&&Number.isFinite(a.budget)&&a.budget>0;
+  const ratio=valid?a.month/a.budget:null;
+  const light=ratio===null?"⚪":ratio>1?"🔴":ratio>=0.8?"🟡":"🟢";
+  return light+" "+a.name+": "+(a.status==="ready"?format(a.month,a.currency):"未取得")+(valid?" ("+(ratio*100).toFixed(0)+"%)":" / 予算未取得");
+ });
  lines.push("月末見込み: "+format(data.forecast,data.currency));
  lines.push((record.day===today?"取得日: ":"前回取得: ")+record.day+(error?"（更新失敗）":""));
  detail.text=lines.join("\n");
