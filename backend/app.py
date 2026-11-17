@@ -142,12 +142,15 @@ def valid_session(value):
         return False
     return int(expiry) > time.time() and hmac.compare_digest(signature.encode(), session_signature(secret, expiry).encode())
 
-@app.post("/api/session")
-def create_session(response: Response, x_api_key: str | None = Header(default=None)):
-    authorized(x_api_key)
+def renew_session(response: Response):
     expiry = str(int(time.time()) + SESSION_SECONDS)
     response.set_cookie(COOKIE_NAME, expiry + "." + session_signature(os.environ["BILLING_READ_TOKEN"], expiry),
                         max_age=SESSION_SECONDS, httponly=True, secure=True, samesite="strict", path="/api")
+
+@app.post("/api/session")
+def create_session(response: Response, x_api_key: str | None = Header(default=None)):
+    authorized(x_api_key)
+    renew_session(response)
     response.headers["Cache-Control"] = "no-store"
     return {"ok": True}
 
@@ -155,6 +158,8 @@ def create_session(response: Response, x_api_key: str | None = Header(default=No
 def billing(request: Request, response: Response, x_api_key: str | None = Header(default=None)):
     if x_api_key or not valid_session(request.cookies.get(COOKIE_NAME)):
         authorized(x_api_key)
+    else:
+        renew_session(response)
     response.headers["Cache-Control"] = "no-store"
     global _cache_until, _cache_value
     with _cache_lock:
