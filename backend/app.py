@@ -1,11 +1,15 @@
 import os
+import hmac
+import hashlib
+import logging
+import time
 from datetime import datetime, timezone, timedelta
 from functools import lru_cache
 from threading import Lock
 from time import monotonic
 from calendar import monthrange
 from zoneinfo import ZoneInfo
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from google.cloud import bigquery
 
@@ -24,7 +28,7 @@ def authorized(key):
     if not secret:
         raise HTTPException(503, "BILLING_READ_TOKEN is not configured")
     import hmac
-    if not key or not hmac.compare_digest(key, secret):
+    if not key or not hmac.compare_digest(key.encode(), secret.encode()):
         raise HTTPException(401, "Unauthorized")
 
 @lru_cache(maxsize=1)
@@ -82,9 +86,35 @@ _cache_lock = Lock()
 _cache_until = 0.0
 _cache_value = None
 
-@app.get("/api/billing")
-def billing(x_api_key: str | None = Header(default=None)):
+COOKIE_NAME = "billing_session"
+SESSION_SECONDS = 180 * 86400
+
+def session_signature(secret, expiry):
+    return hmac.new(secret.encode(), ("billing-session:" + expiry).encode(), hashlib.sha256).hexdigest()
+
+def valid_session(value):
+    secret = os.getenv("BILLING_READ_TOKEN")
+    if not secret or not value:
+        return False
+    expiry, sep, signature = value.partition(".")
+    if not sep or not expiry.isascii() or not expiry.isdigit() or len(expiry) > 12:
+        return False
+    return int(expiry) > time.time() and hmac.compare_digest(signature.encode(), session_signature(secret, expiry).encode())
+
+@app.post("/api/session")
+def create_session(response: Response, x_api_key: str | None = Header(default=None)):
     authorized(x_api_key)
+    expiry = str(int(time.time()) + SESSION_SECONDS)
+    response.set_cookie(COOKIE_NAME, expiry + "." + session_signature(os.environ["BILLING_READ_TOKEN"], expiry),
+                        max_age=SESSION_SECONDS, httponly=True, secure=True, samesite="strict", path="/api")
+    response.headers["Cache-Control"] = "no-store"
+    return {"ok": True}
+
+@app.get("/api/billing")
+def billing(request: Request, response: Response, x_api_key: str | None = Header(default=None)):
+    if x_api_key or not valid_session(request.cookies.get(COOKIE_NAME)):
+        authorized(x_api_key)
+    response.headers["Cache-Control"] = "no-store"
     global _cache_until, _cache_value
     with _cache_lock:
         if _cache_value is not None and monotonic() < _cache_until:
@@ -94,6 +124,7 @@ def billing(x_api_key: str | None = Header(default=None)):
             try:
                 accounts[key] = read_account(name, project, dataset)
             except Exception:
+                logging.getLogger(__name__).exception('Billing retrieval failed for %s', key)
                 # Avoid exposing Google API internals to public clients.
                 accounts[key] = {"name": name, "status": "error"}
         # Each export project has its own budget. Missing/zero means not configured.
