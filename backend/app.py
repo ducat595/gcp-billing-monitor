@@ -12,6 +12,8 @@ from zoneinfo import ZoneInfo
 from fastapi import FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from google.cloud import bigquery
+import google.auth
+from google.auth.transport.requests import AuthorizedSession
 
 app = FastAPI(title="GCP Billing Monitor")
 origins = [x.strip() for x in os.getenv("ALLOWED_ORIGINS", "").split(",") if x.strip()]
@@ -33,7 +35,44 @@ def authorized(key):
 
 @lru_cache(maxsize=1)
 def client():
-    return bigquery.Client()
+    return bigquery.Client(project='tesla-charge-hub')
+
+BILLING_ACCOUNTS = {
+    "tesla": "01F37D-543EF8-154579",
+    "mymap": "018D1B-DC0645-FB4431",
+}
+
+def read_budget(key, currency):
+    credentials, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+    url = "https://billingbudgets.googleapis.com/v1/billingAccounts/" + BILLING_ACCOUNTS[key] + "/budgets"
+    candidates = []
+    params = {"pageSize": 100}
+    with AuthorizedSession(credentials) as session:
+        while True:
+            response = session.get(url, params=params, timeout=20)
+            response.raise_for_status()
+            payload = response.json()
+            for budget in payload.get("budgets", []):
+                filters = budget.get("budgetFilter", {})
+                # Compare whole-account monthly spending only with an equivalent budget.
+                if filters.get("calendarPeriod", "MONTH") != "MONTH" or any(filters.get(k) for k in ("customPeriod", "projects", "services", "subaccounts", "labels", "resourceAncestors")):
+                    continue
+                if filters.get("creditTypesTreatment", "INCLUDE_ALL_CREDITS") != "INCLUDE_ALL_CREDITS":
+                    continue
+                money = budget.get("amount", {}).get("specifiedAmount")
+                if money:
+                    candidates.append((budget, money))
+            token = payload.get("nextPageToken")
+            if not token:
+                break
+            params["pageToken"] = token
+    if len(candidates) != 1:
+        return {"budget": None, "budget_status": "ambiguous" if candidates else "not_configured"}
+    budget, money = candidates[0]
+    if not currency or money.get("currencyCode") != currency:
+        return {"budget": None, "budget_status": "currency_mismatch"}
+    value = int(money.get("units", 0)) + int(money.get("nanos", 0)) / 1e9
+    return {"budget": value if value > 0 else None, "budget_status": "ready" if value > 0 else "not_configured", "budget_name": budget.get("displayName")}
 
 def read_account(name, project, dataset):
     # BigQuery exports use one table per billing account; discover by prefix.
@@ -127,22 +166,21 @@ def billing(request: Request, response: Response, x_api_key: str | None = Header
                 logging.getLogger(__name__).exception('Billing retrieval failed for %s', key)
                 # Avoid exposing Google API internals to public clients.
                 accounts[key] = {"name": name, "status": "error"}
-        # Each export project has its own budget. Missing/zero means not configured.
         for key, account in accounts.items():
-            raw_budget = os.getenv(f"{key.upper()}_MONTHLY_BUDGET", "").strip()
             try:
-                account["budget"] = float(raw_budget) if raw_budget and float(raw_budget) > 0 else None
-            except ValueError:
-                account["budget"] = None
+                account.update(read_budget(key, account.get("currency")))
+            except Exception:
+                logging.getLogger(__name__).exception("Budget retrieval failed for %s", key)
+                account.update(budget=None, budget_status="error")
         ready = [v for v in accounts.values() if v["status"] == "ready"]
         currencies = {v["currency"] for v in ready}
         total = round(sum(v["month"] for v in ready), 2) if len(ready) == len(accounts) and len(currencies) == 1 else None
         forecast = round(sum(v["forecast"] for v in ready), 2) if total is not None and all(v.get("forecast") is not None for v in ready) else None
-        budget = float(os.getenv("MONTHLY_BUDGET", "0"))
+        budget = sum(a["budget"] for a in accounts.values()) if total is not None and all(a.get("budget_status") == "ready" for a in accounts.values()) else 0
         _cache_value = {"generated_at": datetime.now(timezone.utc).isoformat(), "accounts": accounts, "total_month": total, "forecast": forecast, "budget": budget or None, "over_budget": forecast > budget if forecast is not None and budget > 0 else None, "currency": next(iter(currencies)) if len(currencies) == 1 else None}
         ttl = max(300, int(os.getenv("CACHE_SECONDS", "3600")))
         # Retry transient failures sooner; never cache an error for a full hour.
-        _cache_until = monotonic() + (min(ttl, 300) if any(a["status"] == "error" for a in accounts.values()) else ttl)
+        _cache_until = monotonic() + (min(ttl, 300) if any(a["status"] == "error" or a.get("budget_status") == "error" for a in accounts.values()) else ttl)
         return _cache_value
 
 # Serve the dashboard from the same HTTPS origin as the API.
