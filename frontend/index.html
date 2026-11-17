@@ -3,10 +3,10 @@
 <body><main>
 <header><div class="eyebrow">CLOUD FINANCE / LIVE OVERVIEW</div><h1>Cloud <span>Billing</span></h1><p>2つのプロジェクトの利用料金を、ひと目で。</p>
 <nav class="billing-links" aria-label="Google Cloud 請求管理"><a href="https://console.cloud.google.com/billing" target="_blank" rel="noopener noreferrer">Google Cloud 請求管理 ↗</a></nav></header>
-<details class="settings" id="settings"><summary>⚙ 設定</summary><div class="settings-content"><label>API URL <input id="url" placeholder="https://example.com/api/billing"></label><label>閲覧トークン <input id="token" type="password" autocomplete="off"></label><small>認証情報はブラウザに保存しません。</small></div></details><div class="actions"><button id="load">料金を再取得</button></div>
+<details class="settings" id="settings"><summary>⚙ 設定</summary><div class="settings-content"><label>API URL <input id="url" placeholder="https://example.com/api/billing"></label><label>閲覧トークン <input id="token" type="password" autocomplete="off"></label><small>初回のみ閲覧トークンを入力して「料金を再取得」を押してください。認証Cookieは180日間有効です。</small></div></details><div class="actions"><button id="load">料金を再取得</button></div>
 <div class="section-heading"><div><span class="eyebrow">OVERVIEW</span><h2>今月のサマリー</h2></div><span class="period">当月の利用状況</span></div><section class="summary">
 <div class="panel total-panel"><h2>現在の課金額 · 合計</h2><strong id="total">未取得</strong></div>
 <div class="panel"><h2>最終取得</h2><span id="updated">—</span></div>
 </section>
 <div class="section-heading"><div><span class="eyebrow">PROJECTS</span><h2>プロジェクト別の利用状況</h2></div></div><section id="accounts" class="accounts"></section><p id="message" role="status"></p>
-</main><script src="app.js"></script></body></html>
+</main><script src="app.js?v=2"></script></body></html>
